@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=utf-8>
+  <meta name=viewport content="width=device-width,initial-scale=1">
+  <title>Ice 9 Kiosk</title>
+  <link rel=stylesheet href=styles/normalize.css>
+  <link rel=stylesheet href=styles/slothax.css>
+</head>
+<body>
+<a href=home.html class=subtle>Ice 9 Kiosk</a> &gt; <a href=wallet.html class=subtle>Wallet</a> &gt; Load raw private key                  sb4.0
+==================================================================
+
+<label>Raw private key: (libsodium seed, 256-bit hex, reverse byte-order)
+<input id=pri class=hex64 maxlength=64>
+
+<button id=load onclick=load()>  Load  </button>
+<span id=log>
+</span>
+
+<script src=libs/sodium.js></script>
+<script>
+async function load () {
+  const $   = id        => document.getElementById(id)
+  const log = (...args) => $("log").innerText += "\n" + args.join(" ")
+
+  $("pri") .disabled = true
+  $("load").disabled = true
+  try {
+    log("Getting private key input...")
+    const pri = $("pri").value
+    if (!/^[0-9a-f]{64}$/.test(pri)) throw Error("Input isn't in 256-bit hex format")
+    log("OK")
+
+    log("Doing the self-check...")
+    await sodium.ready
+    const pri_bin     = sodium.from_hex(pri)
+    const pri_hsh_bin = sodium.crypto_generichash(32, pri_bin)
+    const pri_hsh     = sodium.to_hex(pri_hsh_bin)
+    if (pri_hsh.slice(0, 3) === '5b4') throw Error("Input is a public key - not a private key")
+    const pub_bin     = sodium.crypto_sign_seed_keypair(pri_bin).publicKey
+    const pub_hsh_bin = sodium.crypto_generichash(32, pub_bin)
+    const pub_hsh     = sodium.to_hex(pub_hsh_bin)
+    if (pub_hsh.slice(0, 3) !== '5b4') throw Error("Public key failed self-check. Maybe there's a typo?")
+    log("OK")
+
+    log("Putting private key in session storage...")
+    sessionStorage.clear()
+    sessionStorage.setItem("pri", pri)
+    log("OK")
+
+    $("pri").value = "" // clear from browser history
+    location = "wallet.html"
+  } catch (error) {
+    console.error(error)
+    alert(error)
+    log(error)
+    $("pri") .disabled = false
+    $("load").disabled = false
+  }
+}
+</script>
+</body>
+</html>

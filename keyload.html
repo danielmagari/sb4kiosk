@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=utf-8>
+  <meta name=viewport content=width=device-width,initial-scale=1>
+  <title>Ice 9 Kiosk</title>
+  <link rel=stylesheet href=styles/normalize.css>
+  <link rel=stylesheet href=styles/slothax.css>
+</head>
+<body>
+<a href=home.html class=subtle>Ice 9 Kiosk</a> &gt; <a href=wallet.html class=subtle>Wallet</a> &gt; Load private key from file            sb4.0
+==================================================================
+
+<button id=chooser onclick=chooseFile()>   Choose file...  </button> <input id=file type=file accept=text/plain onchange=openFile()>
+
+<span id=log></span>
+
+<script src=libs/sodium.js></script>
+<script>
+const $   = id        => document.getElementById(id)
+const log = (...args) => $("log").innerText += "\n" + args.join(" ")
+
+function chooseFile () {
+  $("file").value = null
+  $("file").click()
+}
+
+function openFile () {
+  $("chooser").disabled = true
+  try {
+    log("Getting selected file handle...")
+    const files = $("file").files
+    if (!files) throw Error("No file selected")
+    const file = files[0]
+    log("OK")
+
+    /* File.text() promise API - isn't available in iOS yet (2020-01-09)
+    log("Reading file...")
+    const pri = (await file.text()).trim()
+    if (!/^[0-9a-f]{64}$/.test(pri)) throw 'Private key is not in 256-bit hex format'
+    log("OK")*/
+
+    // FileReader event API - for mobile/older browsers
+    log("Reading file...")
+    const reader = new FileReader()
+    reader.readAsText(file, 'ascii')
+    reader.onload = parseFile
+  } catch (error) {
+    console.error(error)
+    alert(error)
+    log(error)
+    $("chooser").disabled = false
+    $("file").value = null
+  }
+}
+
+async function parseFile (event) {
+  try {
+    const pri = event.target.result.trim()
+    if (!/^[0-9a-f]{64}$/.test(pri)) throw 'Private key is not in 256-bit hex format'
+    log("OK")
+
+    log("Doing the self-check...")
+    await sodium.ready
+    const pri_bin     = sodium.from_hex(pri)
+    const pri_hsh_bin = sodium.crypto_generichash(32, pri_bin)
+    const pri_hsh     = sodium.to_hex(pri_hsh_bin)
+    if (pri_hsh.slice(0, 3) === '5b4') throw Error("Input is a public key - not a private key")
+    const pub_bin     = sodium.crypto_sign_seed_keypair(pri_bin).publicKey
+    const pub_hsh_bin = sodium.crypto_generichash(32, pub_bin)
+    const pub_hsh     = sodium.to_hex(pub_hsh_bin)
+    if (pub_hsh.slice(0, 3) !== '5b4') throw Error("Public key failed self-check. Maybe there's a typo?")
+    log("OK")
+
+    log("Putting private key in session storage...")
+    sessionStorage.clear()
+    sessionStorage.setItem("pri", pri)
+    log("OK")
+
+    $("file").value = null // clear from browser history
+    location = "wallet.html"
+  } catch (error) {
+    console.error(error)
+    alert(error)
+    log(error)
+    $("chooser").disabled = false
+    $("file").value = null
+  }
+}
+</script>
+</body>
+</html>

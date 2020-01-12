@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=ascii>
+  <meta name=viewport content="width=device-width,initial-scale=1">
+
+  <title>Ice 9 Kiosk</title>
+
+  <link rel=stylesheet href=styles/normalize.css>
+  <link rel=stylesheet href=styles/slothax.css>
+</head>
+<body>
+<a href=home.html class=subtle>Ice 9 Kiosk</a> > Wallet                                         sb4.0
+==================================================================
+<span id=pri_not_loaded hidden>
+                   <a href=keygen.html   >   Generate new private key   </a>
+
+                   <a href=keyimport.html>     Load raw private key     </a>
+
+                   <a href=keyload.html  >  Load private key from file  </a>
+
+==================================================================
+</span><span id=pri_loaded hidden>
+Node:
+<input id=node class=node64 disabled>
+
+Your private key:
+<input id=pri class=hex64 disabled>
+
+Your public key:
+<input id=pub class=hex64 disabled>
+
+Your current balance:  <input id=balance class=amount disabled>  <a href=wallet.html class=subtle>[  Refresh  ]</a>
+
+==================================================================
+
+           <a href=send.html>  Send new transaction  </a>    <button onclick=clearPri()>  Clear &amp; Exit  </button>
+
+==================================================================
+</span><span id=log></span>
+
+<script src=libs/sodium.js></script>
+<script>
+function clearPri () {
+  sessionStorage.clear()
+  location = location
+}
+
+async function main () {
+  const $    = id        => document.getElementById(id)
+  const log = (...args) => $("log").innerText += "\n" + args.join(" ")
+  const GET  = async url => await (await fetch(url)).json()
+  try {
+    log("Getting node from local storage...")
+    const node = localStorage.getItem("node")
+    if (!node) throw Error("No node specified")
+    log(node)
+    log("OK")
+
+    log("Getting private key from session storage...")
+    const pri = sessionStorage.getItem("pri")
+    log(pri || "(none)")
+    log("OK")
+
+    if (!pri) {
+      $("pri_not_loaded").hidden = false
+      return
+    }
+
+    log("Calculating public key...")
+    await sodium.ready
+    const pri_bin = sodium.from_hex(pri)
+    const pub_bin = sodium.crypto_sign_seed_keypair(pri_bin).publicKey
+    const pub     = sodium.to_hex(pub_bin)
+    log(pub)
+    log("OK")
+
+    // Get balance
+    log("Getting kit...")
+    const kit = await GET(node + "/kit?pub=" + pub)
+    log(JSON.stringify(kit, null, 1))
+    log("OK")
+
+    $("pri_loaded").hidden = false
+    $("node").value = node
+    $("pri").value = "(loaded in session storage)"
+    $("pub").value = pub
+    $("balance").value = kit.balance
+  } catch (error) {
+    console.error(error)
+    log(error)
+    alert(error)
+    if (confirm("Reset the application?")) exit()
+  }
+}
+main()
+</script>
+</body>
+</html>

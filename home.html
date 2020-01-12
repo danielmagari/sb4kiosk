@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=ascii>
+  <meta name=viewport content=width=device-width,initial-scale=1>
+
+  <title>Ice 9 Kiosk</title>
+
+  <link rel=stylesheet href=styles/normalize.css>
+  <link rel=stylesheet href=styles/slothax.css>
+</head>
+<body>
+Ice 9 Kiosk                                                  sb4.0
+==================================================================
+<span hidden id=main>
+         <a href=blockchain.html>      Blockchain      </a>    <a href=wallet.html>        Wallet        </a>
+</span>
+==================================================================
+<span id=log></span>
+<a hidden id=exit class=subtle onclick=exit()>[ Exit ]</a>
+<script>
+async function main () {
+  const $   = id        => document.getElementById(id)
+  const cls = ()        => $('log').innerText  = ""
+  const log = (...args) => $('log').innerText += "\n"   + args.join(" ")
+  const ok  = (...args) => $('log').innerText += " OK " + args.join(" ")
+  const GET = async url => await (await fetch(url)).json()
+
+  try {
+    // Get the node from local storage
+    log("Getting node from local storage...")
+    const node = localStorage.getItem("node")
+    if (!node) throw Error("No node specified")
+    ok()
+
+    // Get the node's status
+    log("Getting node status...")
+    const status = await GET(node + "/status")
+    if (!status.protocols.includes("sb4")) throw Error("sb4 protocol not supported")
+    ok()
+
+    // Show the node's status
+    log(JSON.stringify(status, null, 1))
+
+    $("main").hidden = false
+    $("exit").hidden = false
+  } catch (error) {
+    console.error(error)
+    alert(error)
+    if (confirm("Exit the application?")) exit()
+  }
+}
+main()
+
+// Clears memory and resets the application
+function exit () {
+  sessionStorage.clear()
+  localStorage.clear()
+  location = "/"
+}
+</script>
+</body>
+</html>

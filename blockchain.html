@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=ascii>
+  <meta name=viewport content=width=device-width,initial-scale=1>
+
+  <title>Ice 9 Kiosk</title>
+
+  <link rel=stylesheet href=styles/normalize.css>
+  <link rel=stylesheet href=styles/slothax.css>
+</head>
+<body>
+<a href=home.html class=subtle>Ice 9 Kiosk</a> &gt; Blockchain Explorer                            sb4.0
+==================================================================
+<span id=forms hidden><form action=block.html>Get block by id
+<input class=hex64 maxlength=64 name=id id=block_id_input>
+                                                            <button>  Go  </button></form>
+<form action=block.html>Get block by parent
+<input class=hex64 maxlength=64 name=parent id=block_parent_input>
+                                                            <button>  Go  </button></form>
+<form action=account.html>Get account by public key
+<input class=hex64 maxlength=64 name=pub id=account_pub_input>
+                                                            <button>  Go  </button></form>
+==================================================================
+</span><span id=blocks hidden>Latest blocks
+Height        Transactions    Bans            Net amount sent
+============= =============== =============== ====================
+</span><span id=log></span><script>
+async function main () {
+  const $    = id        => document.getElementById(id)
+  const log  = (...args) => $('log').innerText += "\n" + args.join(" ")
+  const GET  = async url => await (await fetch(url)).json()
+  const last = array     => array[array.length - 1]
+  const lpad = (string, width) => (" ".repeat(width) + string).slice(0 -width)
+  const rpad = (string, width) => (string + " ".repeat(width)).slice(0, width)
+  const sent = block => block.txs.reduce((sum, tx) => sum += ~~tx.gross - 100, 0)
+
+  try {
+    // Get the node from local storage
+    log("Getting node from local storage...")
+    const node = localStorage.getItem("node")
+    if (!node) throw Error("No node specified")
+    log(node)
+    log("OK")
+
+    // Get the latest kit
+    log("Getting kit...")
+    const kit = await GET(node + "/kit?pub=" + "00".repeat(32))
+    log(JSON.stringify(kit, null, 1))
+    log("OK")
+
+    // Get the tip block
+    log("Getting tip block...")
+    const tip = await GET(node + "/tip")
+    if (tip.parent !== kit.parent) {
+      const try_again = confirm("Blockchain reorganized while loading. Try again?")
+      return try_again ? location = location : null
+    }
+    const tip_a = document.createElement("a")
+    tip_a.className = "subtle"
+    tip_a.href = "block.html?parent=" + tip.parent
+    tip_a.innerText = rpad(kit.height + " (tip)", 13) + " " + lpad(tip.txs.length, 15) + " " + lpad(tip.bans.length, 15) + " " + lpad(sent(tip), 20)
+    $("blocks").appendChild(tip_a)
+    log("OK")
+
+    // Show the forms
+    $("log").hidden = true
+    $("forms").hidden = false
+    $("blocks").hidden = false
+
+    // Get the next 9 blocks
+    const blocks = [tip]
+    for (let i = 1; i < 10 && i <= kit.height; i++) {
+      log("Getting parent block...")
+      const id = last(blocks).parent
+      const block = await GET(node + "/block?id=" + id)
+      const block_a = document.createElement("a")
+      block_a.className = "subtle"
+      block_a.href = "block.html?id=" + id
+      block_a.innerText = rpad(kit.height - i, 13) + " " + lpad(block.txs.length, 15) + " " + lpad(block.bans.length, 15) + " " + lpad(sent(block), 20)
+      $("blocks").appendChild(block_a)
+      blocks.push(block)
+      log("OK")
+
+      // Stop at root
+      if (block.parent === "04d98b1a25694520f18fdfb398d0a56575ac6e34d907735b6b037ba2e7da49ef") break
+    }
+  } catch (error) {
+    console.error(error)
+    alert(error)
+    if (confirm("Try again?")) location = location
+  }
+}
+main()
+</script></body>
+</html>

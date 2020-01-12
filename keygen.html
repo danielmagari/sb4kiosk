@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=ascii>
+  <meta name=viewport content="width=device-width,initial-scale=1">
+  <title>Ice 9 Kiosk</title>
+  <link rel=stylesheet href=styles/normalize.css>
+  <link rel=stylesheet href=styles/slothax.css>
+</head>
+<body>
+<a href=home.html class=subtle>Ice 9 Kiosk</a> &gt; <a href=wallet.html class=subtle>Wallet</a> &gt; Keygen                                sb4.0
+==================================================================
+<span id=intro>
+This tool generates you a new self-checking private key. All
+computation is done client-side and no data is transmitted to the
+kiosk server. Once it's generated, you will be given a plaintext
+private key file to save in a safe place.
+
+Technical details
+=================
+An sb4-type private key follows the libsodium seed standard (a
+256-bit number serialized as hexadecimal in reverse byte-order).
+There is a soft requirement (in-wallet only) that the 256-bit
+blake2b digest of the public (but not private) key (in reverse
+byte-order) starts with 5b4. This gives a >99% probability of
+catching typos and correctly identifies private from public keys,
+with a negligible loss of real-world cryptographic strength and no
+need for external checksums.
+
+
+<a onclick=generate()>       Generate...      </a>
+</span><span id=result hidden>Results
+</span>
+
+<a id=save_link hidden>  Save file...  </a>  <a id=done_link hidden class=subtle href=wallet.html>[  Done  ]</a>
+<span id=log></span>
+
+<script src=libs/sodium.js></script>
+<script>
+// Generates a new Slothburn 4 self-checking keypair
+async function generate () {
+  const $ = id => document.getElementById(id)
+  const log = (...args) => $("log").innerText += "\n" + args.join(" ")
+  try {
+    $("intro").hidden = true
+
+    log("Getting random 256-bit nonce...")
+    await sodium.ready
+    const pri = sodium.randombytes_buf(32)
+    log("OK")
+
+    log("Incrementing nonce until it satisfies the self-check...")
+    for (let i = 0; i < 100000; i++) {
+      if (i % 1000 === 0) log("Attempt", i)
+
+      // Increment the private key seed
+      sodium.increment(pri)
+
+      // Avoid the seed if its hash is magical
+      const pri_hsh = sodium.crypto_generichash(32, pri)
+      const pri_hsh_hex = sodium.to_hex(pri_hsh)
+      if (pri_hsh_hex.slice(0, 3) === '5b4') continue
+
+      // Calculate the public key
+      const pub = sodium.crypto_sign_seed_keypair(pri).publicKey
+
+      // Use the seed if its public key is magical
+      const pub_hsh = sodium.crypto_generichash(32, pub)
+      const pub_hsh_hex = sodium.to_hex(pub_hsh)
+      if (pub_hsh_hex.slice(0, 3) === '5b4') {
+        log("Succeeded on attempt", i)
+        log("OK")
+
+        log("Generating save file link...")
+        const pri_hex = sodium.to_hex(pri)
+        const pub_hex = sodium.to_hex(pub)
+        const now = ~~(Date.now()/1000)
+        $("save_link").hidden = false
+        $("save_link").setAttribute("download", "Private Key " + now + ".sb4.txt")
+        $("save_link").setAttribute("href", "data:text/plain;charset=ascii," + pri_hex)
+        $("save_link").onclick = () => { $("done_link").hidden = false }
+        log("OK")
+
+        log("Printing result summary...")
+        $("result").hidden = false
+        $("result").innerText += "\nGenerated private key at\n" + now + " (unix time)"
+        $("result").innerText += "\n\nPrivate key\n"           + pri_hex.slice(0, 4) + "... (hidden - must save file)"
+        $("result").innerText += "\n\nPublic key \n"           + pub_hex.slice(0, 4) + "... (hidden - must load file)"
+        log("OK")
+
+        alert('Generated new self-checking key. Be sure to save a copy!')
+        $("log").hidden = true
+        return
+      }
+    }
+    throw 'Failed to generate self-checking keypair after 100,000 tries.'
+  } catch (error) {
+    console.error(error)
+    log(error)
+    alert(error)
+  }
+}
+</script>
+</body>
+</html>

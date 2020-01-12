@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=ascii>
+  <meta name=viewport content=width=device-width,initial-scale=1>
+
+  <title>Ice 9 Kiosk</title>
+
+  <link rel=stylesheet href=styles/normalize.css>
+  <link rel=stylesheet href=styles/slothax.css>
+</head>
+<body>
+<a href=home.html class=subtle>Ice 9 Kiosk</a> &gt; <a href=blockchain.html class=subtle>Blockchain Explorer</a> &gt; Block Info               sb4.0
+==================================================================
+
+<a id=parent_link hidden>  &lt; Parent block  </a>                              <a id=child_link hidden>   Child block &gt;  </a>
+
+==================================================================
+<span id=block hidden></span><span id=log></span>
+
+<script src=libs/sodium.js></script>
+<script>
+async function main () {
+  await sodium.ready
+  const $    = id        => document.getElementById(id)
+  const log  = (...args) => $('log').innerText += "\n" + args.join(" ")
+  const GET  = async url => await (await fetch(url)).json()
+  const last = array     => array[array.length - 1]
+  const lpad = (string, width) => (" ".repeat(width) + string).slice(0 -width)
+  const rpad = (string, width) => (string + " ".repeat(width)).slice(0, width)
+  const sent = block => block.txs.reduce((sum, tx) => sum += ~~tx.gross - 100, 0)
+
+  try {
+    // Get the node from local storage
+    log("Getting node from local storage...")
+    const node = localStorage.getItem("node")
+    if (!node) throw Error("No node specified")
+    log(node)
+    log("OK")
+
+    // Determine what block identifier parameter to use
+    log("Determining what block indentifier to use...")
+    const searchParams = (new URL(location)).searchParams
+    const id     = searchParams.get('id')
+    const parent = searchParams.get('parent')
+    if (id     && !/^[0-9a-f]{64}$/.test(id))     throw Error("Invalid block id")
+    if (parent && !/^[0-9a-f]{64}$/.test(parent)) throw Error("Invalid block parent")
+    if (!id && !parent) throw Error("No block identifier specified")
+    if ( id &&  parent) throw Error("Conflicting block identifiers")
+    if (id)     log("Block id\n"     + id)
+    if (parent) log("Block parent\n" + parent)
+    log("OK")
+
+    // Get the latest status
+    log("Getting kit...")
+    const kit = await GET(node + "/kit?pub=" + "00".repeat(32))
+    log(JSON.stringify(kit, null, 1))
+    log("OK")
+
+    // Get the block
+    log("Getting block...")
+    const block = await GET(node + "/block?" + (id ? "id=" + id : (parent ? "parent=" + parent : "")))
+    if (!block) throw Error("Block not found")
+    if (parent && block.parent !== parent) throw Error("Block parent doesn't match")
+    log("OK")
+
+    // Calculate the block's id
+    log("Calculating the block's id...")
+    const core = {
+      parent: block.parent,
+      txs: block.txs.map(tx => ({
+        from:  tx.from,
+        to:    tx.to,
+        gross: tx.gross
+      })),
+      bans: block.bans.map(ban => ({
+        from: ban.from
+      }))
+    }
+    const core_str = JSON.stringify(core)
+    const core_hsh = sodium.crypto_generichash(32, core_str)
+    const block_id = sodium.to_hex(core_hsh)
+    if (id && block_id !== id) throw Error("Block id doesn't match")
+    log(block_id)
+    log("OK")
+
+    // Show the parent link if this isn't the genesis block
+    log("Determining if this is the genesis block...")
+    const is_genesis = block.parent === "04d98b1a25694520f18fdfb398d0a56575ac6e34d907735b6b037ba2e7da49ef"
+    if (is_genesis) {
+      $("parent_link").className = "subtle"
+      $("parent_link").innerText = "   (at genesis)   "
+    } else {
+      $("parent_link").href = "block.html?id=" + block.parent
+    }
+    $("parent_link").hidden = false
+    log(is_genesis)
+    log("OK")
+
+    // Show the child link if this isn't the tip block
+    log("Determining if this is the tip block...")
+    const is_tip = block.parent === kit.parent
+    if (is_tip) {
+      $("child_link").className = "subtle"
+      $("child_link").innerText = "     (at tip)     "
+      $("child_link").href = "block.html?parent=" + block.parent
+    } else {
+      $("child_link").href = "block.html?parent=" + block_id
+    }
+    $("child_link").hidden = false
+    log(is_tip)
+    log("OK")
+
+    // Generate the block's info
+    log("Printing the block's info...")
+    const puts = (...args) => { $("block").innerText += ("\n" + args.join("")) }
+    const link = (href, param) => {
+      const a = document.createElement("a")
+      a.className = "subtle"
+      a.innerText = param
+      a.href = href + param
+      $("block").appendChild(a)
+    }
+    const hr = "=".repeat(66)
+    $("block").hidden = false
+    puts("BLOCK INFO")
+    puts("==========")
+    puts("Id:\n", block_id)
+    puts("Parent: \n", block.parent)
+    puts("Transactions:    ", block.txs.length)
+    puts("Bans:            ", block.bans.length)
+    puts("Net amount sent: ", sent(block))
+    puts(hr)
+    block.txs.forEach((tx, i) => {
+      puts("\nTransaction ", i, ":")
+      puts("Public key from:\n"); link("account.html?pub=", tx.from)
+      puts("Public key to:  \n"); link("account.html?pub=", tx.to)
+      puts("Gross amount sent: ", tx.gross)
+      puts("Sender's signature:", "\n", tx.sig.slice(0, 64), "\n", tx.sig.slice(64))
+    })
+    puts(hr)
+    block.bans.forEach((ban, i) => {
+      puts("\nBan ", i, ":")
+      puts("Sender's public key:\n"); link("account.html?pub=", ban.from)
+      ban.conflicts.forEach((conflict, j) => {
+        puts("Conflict ", j, ": Receiver's public key:\n"); link("account.html?pub=", conflict.to)
+        puts("Conflict ", j, ": Gross amount sent: ", conflict.gross)
+        puts("Conflict ", j, ": Sender's signature:", "\n", conflict.sig.slice(0, 64), "\n", conflict.sig.slice(64))
+      })
+    })
+    log("OK")
+
+    $("log").hidden = true
+  } catch (error) {
+    console.error(error)
+    alert(error)
+  }
+}
+main()
+</script></body>
+</html>

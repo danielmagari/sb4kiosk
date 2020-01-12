@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=ascii>
+  <meta name=viewport content="width=device-width,initial-scale=1">
+
+  <title>Ice 9 Kiosk</title>
+
+  <link rel=stylesheet href=styles/normalize.css>
+  <link rel=stylesheet href=styles/slothax.css>
+</head>
+<body>
+<a href=home.html class=subtle>Ice 9 Kiosk</a> &gt; <a href=wallet.html class=subtle>Wallet</a> &gt; Send transaction                      sb4.0
+==================================================================
+<span id=form hidden>
+Node:
+<input id=node class=node64 disabled>
+
+Your private key:
+<input id=pri_fake class=hex64 disabled> <input id=pri disabled type=hidden>
+
+Your public key:
+<input id=pub class=hex64 disabled>
+
+Public key to send to:  <span id=to_err style=color:red></span>
+<input id=to class=hex64 maxlength=64 disabled oninput=checkForm()>
+
+Your current balance: <input id=balance class=amount disabled>
+
+Net amount to send:   <input id=net class=amount disabled oninput=checkForm() maxlength=12>  (what's actually received)
+
+Burn:                 <input id=burn class=amount disabled>
+
+Total deducted:       <input id=gross class=amount disabled>
+
+Your final balance:   <input id=remainder class=amount disabled>
+
+<button id=send disabled onclick=sendTransaction()>   Send... </button>  <button id=cancel disabled onclick=cancelTransaction()>  Cancel  </button>  <button id=view disabled>  View on blockchain  </button>
+
+==================================================================
+</span><span id=log></span>
+
+<script src=libs/sodium.js></script>
+<script src=send.js></script>
+</body>
+</html>

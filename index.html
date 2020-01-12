@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=ascii>
+  <meta name=viewport content=width=device-width,initial-scale=1>
+
+  <title>Ice 9 Kiosk</title>
+
+  <link rel=stylesheet href=styles/normalize.css>
+  <link rel=stylesheet href=styles/slothax.css>
+</head>
+<body>
+<div id=logo style="line-height:1em; color:#0000ff"></div>
+              "<i>For all your crypto needs, since 2249.</i>"
+
+Welcome! Please choose your Ice 9 node:
+https://<input id=hostname style=width:40ch>:16804 <a id=connect onclick=connect()>  Connect  </a>
+<span id=log></span>
+<script>
+const $      = id => document.getElementById(id)
+const sleep  = ms => new Promise(wake => setTimeout(wake, ms))
+
+// Animates the Ridley Scott logo
+async function animate_logo () {
+  const logo = `
+                              ▞██
+                              ▟▛▀▖
+                            ▗▛▞▘ ▝▙
+                           ▄▘ ▛    ▚▖
+                          ▐▘ ▗▌     ▝▖
+                        ▗▐   ▟       ▝▚
+                       ▗▘   ▗▌         ▚▖
+                      ▟▘    ▟           ▝▖
+                   ▗▄▐     ▞██           ▝▚
+                   ▝█▛    ▄▘  ▀▗▖          ▚▄▖
+                    ▞▀▄  ▐▘      ▀▗       ▗▐█▀
+                    ▞▌▞██          ▝▚▟▙▖▝▘  █
+                    ▗▙▐▀▜▖        ▗▖▝▀▀▘▗   ▛
+                    ▀▜▌  ▝▖    ▄ ▀        ▜██
+                      ▜▖  ▞██▝▘           ▗▀▘
+                       ▜▖  ▝▌            ▄▘
+                        ▝▖  ▜           ▐
+                         ▝▖ ▝▌        ▗▀
+                          ▝▖ ▜       ▟▘
+                           ▝▖▝▌    ▗▐
+                            ▝▖▙   ▗▀
+                             ▝█▖ ▟▘
+                              ▞██
+                               ▀▘`;
+  const input  = logo.split("\n")
+  const lines  = input.length
+  const buffer = " ".repeat(lines).split("")
+  const output = $('logo')
+  const render = async () => output.innerText = buffer.join("\n")
+
+  // Render the scanlines in a pseudorandom order
+  const order = []
+  for (let i = 0; i < lines; i++) order[i] = i
+  order.sort(() => Math.random() - 0.5)
+  for (let i = 0; i < lines; i++) {
+    const j = order[i]
+    buffer[j] = input[j]
+    render()
+    await sleep(13*j)
+  }
+}
+
+// Connects to a node and goes to the dashboard
+async function connect () {
+  const GET    = async url => await (await fetch(url)).json()
+  const log = (...args) => $('log').innerText += "\n" + args.join(" ")
+  const ok  = (...args) => $('log').innerText += " OK " + args.join(" ")
+
+  $('log').innerText = ''
+  $('hostname').disabled = true
+  $('connect').disabled = true
+  const hostname = $('hostname').value.trim()
+  try {
+    // Validate the URL
+    log('Validating hostname', hostname, '...')
+    const url = new URL('https://' + hostname + ':16804')
+    if (url.hostname !== hostname) throw "Failed to parse hostname: " + url.hostname
+    if (url.port     !== '16804')  throw "Port mismatch: " + url.port
+    if (url.protocol !== 'https:') throw "Protocol mismatch: " + url.protocol
+    const node = 'https://' + url.hostname + ':16804'
+    ok()
+
+    // Try to connect to the node
+    log('Connecting to', node, '...')
+    const status = await GET(node + '/status')
+    ok(JSON.stringify(status, null, 1))
+
+    // Check if the node supports the sb4 protocol
+    log('Checking for sb4 protocol support ...')
+    if (!status.protocols.includes('sb4')) throw "Node doesn't support the sb4 protocol"
+    ok()
+
+    // Set the global node url
+    log('Setting local storage ...')
+    localStorage.setItem('node', node)
+    ok()
+
+    // Go to the homepage
+    location = 'home.html'
+  } catch (error) {
+    console.error(error)
+    alert(error)
+    log(error)
+  }
+  $('hostname').disabled = false
+  $('connect').disabled = false
+}
+
+function main () {
+  animate_logo()
+  const node = localStorage.getItem('node') || 'https://seed1.1ce9.com:16804'
+  $('hostname').value = (new URL(node)).hostname
+}
+main ()
+</script>
+</body>
+</html>

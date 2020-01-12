@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=ascii>
+  <meta name=viewport content=width=device-width,initial-scale=1>
+
+  <title>Ice 9 Kiosk</title>
+
+  <link rel=stylesheet href=styles/normalize.css>
+  <link rel=stylesheet href=styles/slothax.css>
+</head>
+<body>
+<a href=home.html class=subtle>Ice 9 Kiosk</a> &gt; <a href=blockchain.html class=subtle>Blockchain Explorer</a> &gt; Account Info             sb4.0
+==================================================================
+<span id=account hidden></span><span id=log></span>
+
+<script src=libs/sodium.js></script>
+<script>
+async function main () {
+  await sodium.ready
+  const $    = id        => document.getElementById(id)
+  const log  = (...args) => $("log").innerText += "\n" + args.join(" ")
+  const GET  = async url => await (await fetch(url)).json()
+  try {
+    // Get the node from local storage
+    log("Getting node from local storage...")
+    const node = localStorage.getItem("node")
+    if (!node) throw Error("No node specified")
+    log(node)
+    log("OK")
+
+    // Get the public key
+    log("Determining what public key to look up...")
+    const pub_hex = (new URL(window.location)).searchParams.get("pub")
+    if (!pub_hex)                        throw Error("No public key specified")
+    if (!/^[0-9a-f]{64}$/.test(pub_hex)) throw Error("Input is not 256-bit hex")
+    log(pub_hex)
+    log("OK")
+
+    // Ensure that it"s not the user"s private key (if any)
+    log("Ensuring that it's not your private key...")
+    const pri_hex = sessionStorage.getItem("pri")
+    if (pri_hex && pri_hex === pub_hex) throw Error("But this is your private key!")
+    log("OK")
+
+    // Ensure that it's not a private key
+    log("Ensuring that it's a self-checking public key...")
+    const pub         = sodium.from_hex(pub_hex)
+    const pub_hsh     = sodium.crypto_generichash(32, pub)
+    const pub_hsh_hex = sodium.to_hex(pub_hsh)
+    if (pub_hsh_hex.slice(0, 3) !== "5b4") {
+      if (!confirm("This isn't a self-checking public key! Are you sure you want to look it up? If you accidentally entered your private key, it will be sent over the wire!")) {
+        log("Cancelled")
+        return
+      }
+    }
+    log("OK")
+
+    // Get the kit
+    log("Getting kit...")
+    const kit = await GET(node + "/kit?pub=" + pub_hex)
+    if (pub_hex !== kit.pub) throw Error("The node returned the wrong account")
+    log("OK")
+
+    $("log").hidden = true
+    $("account").hidden = false
+    $("account").innerText  = "\nACCOUNT INFO"
+    $("account").innerText += "\n============"
+    $("account").innerText += "\n\nPublic key:\n" + pub_hex
+    $("account").innerText += "\n\nParent balance:  " + kit.parentBalance
+    $("account").innerText += "\n\nCurrent balance: " + kit.balance
+
+  } catch (error) {
+    console.error(error)
+    $("account").innerText = error
+    alert(error)
+  }
+}
+main()
+</script>
+</body>
+</html>

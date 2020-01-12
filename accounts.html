@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=utf-8>
+  <meta name=viewport content=width=device-width,initial-scale=1>
+  <title>Ice 9 Kiosk</title>
+  <link rel=stylesheet href=styles/normalize.css>
+  <link rel=stylesheet href=styles/slothax.css>
+</head>
+<body>
+<a href=/ class=subtle>Ice 9 Kiosk</a> > Account Book                                   sb4.0
+==================================================================
+Get account by public key
+<input id=get_by_pub class=hex64 maxlength=64>
+                                                              <a onclick=get_by_pub()> Go </a>
+==================================================================
+
+Examples (3 Amigos)
+<a class=subtle onclick="$('get_by_pub').value = this.innerText">5eeb2057cbfd472e6e7790c0523a879840cc4cec5d1dd4fd7c7005535d20e0a5</a>
+<a class=subtle onclick="$('get_by_pub').value = this.innerText">277448a7da8cd60576dcd7f4701ae1e6ce61f30ced0742ae3dc722e273b21445</a>
+<a class=subtle onclick="$('get_by_pub').value = this.innerText">45159a696f0430a6840b39fd63cb0cfc6c9360927235e62a1abb3c40bb54be34</a>
+<script>
+const $ = id => document.getElementById(id)
+const get_by_pub = () => location.assign('account.html?pub='+$('get_by_pub').value)
+</script>
+</body>
+</html>
